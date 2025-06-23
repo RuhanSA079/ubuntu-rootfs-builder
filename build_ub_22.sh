@@ -18,6 +18,8 @@ mkdir -p BaseOS
 cd BaseOS
 
 DEBUG_BUILD=1
+ENABLE_DOCKER=0
+ENABLE_SNAPD=0
 
 function umountBindMounts(){
         echo "Unmounting bind mounts..."
@@ -39,7 +41,13 @@ function addFilesForChroot(){
         echo "deb [trusted=yes] http://ports.ubuntu.com/ubuntu-ports/ jammy-security main restricted" >> etc/apt/sources.list
         echo "deb [trusted=yes] http://ports.ubuntu.com/ubuntu-ports/ jammy-security universe" >> etc/apt/sources.list
         echo "deb [trusted=yes] http://ports.ubuntu.com/ubuntu-ports/ jammy-security multiverse" >> etc/apt/sources.list
-        #echo "deb [arch=arm64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu jammy stable" >> etc/apt/sources.list
+
+        if [ $ENABLE_DOCKER -eq 1 ];
+        then
+                echo "ENABLE_DOCKER pragma is enabled."
+                echo "deb [arch=arm64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu jammy stable" >> etc/apt/sources.list
+        fi
+
         mkdir -p tmp/
         echo "#!/bin/bash" > tmp/inside_chroot.sh
         echo "echo 'Updating apt repository cache...' " >> tmp/inside_chroot.sh
@@ -54,11 +62,20 @@ function addFilesForChroot(){
                 echo "DEBIAN_FRONTEND=noninteractive apt install -y initramfs-tools device-tree-compiler u-boot-tools" >> tmp/inside_chroot.sh
         fi
 
-        #echo "echo Installing keys for use on Docker repos..." >> tmp/inside_chroot.sh
-        #echo "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg" >> tmp/inside_chroot.sh
-        #echo "apt update" >> tmp/inside_chroot.sh
-        #echo "DEBIAN_FRONTEND=noninteractive apt install -y docker-ce docker-ce-cli containerd.io" >> tmp/inside_chroot.sh
-        echo "DEBIAN_FRONTEND=noninteractive apt install -y snapd" >> tmp/inside_chroot.sh
+        if [ $ENABLE_DOCKER -eq 1 ];
+        then
+                echo "echo Installing keys for use on Docker repos..." >> tmp/inside_chroot.sh
+                echo "curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg" >> tmp/inside_chroot.sh
+                echo "apt update" >> tmp/inside_chroot.sh
+                echo "DEBIAN_FRONTEND=noninteractive apt install -y docker-ce docker-ce-cli containerd.io" >> tmp/inside_chroot.sh
+        fi
+
+        if [ $ENABLE_SNAPD -eq 1 ];
+        then
+                echo "Installing snapd..."
+                echo "DEBIAN_FRONTEND=noninteractive apt install -y snapd" >> tmp/inside_chroot.sh
+        fi
+
         echo "echo 'Fixing NetworkManager...'" >> tmp/inside_chroot.sh
         echo "touch /etc/NetworkManager/conf.d/10-globally-managed-devices.conf" >> tmp/inside_chroot.sh
         echo "echo 'Adding admin user for login...' " >> tmp/inside_chroot.sh
